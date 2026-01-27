@@ -38,13 +38,19 @@ EOF
   fi
 
   # Remove the original config file if it's not /boot/limine.conf
-  if [[ "$limine_config" != "/boot/limine.conf" ]] && [[ -f "$limine_config" ]]; then
-    sudo rm "$limine_config"
-  fi
+  #if [[ "$limine_config" != "/boot/limine.conf" ]] && [[ -f "$limine_config" ]]; then
+  #  sudo rm "$limine_config"
+  #fi
 
   # We overwrite the whole thing knowing the limine-update will add the entries for us
-  sudo cp $OMARCHY_PATH/default/limine/limine.conf /boot/limine.conf
+  #  sudo cp $OMARCHY_PATH/default/limine/limine.conf /boot/limine.conf
+  if [ ! -f /boot/limine.conf ]; then
+    sudo cp $OMARCHY_PATH/default/limine/limine.conf /boot/limine.conf
+  fi
 
+  # Ensure compat path always exists for tools/scripts expecting /boot/limine/limine.conf
+  sudo mkdir -p /boot/limine
+  sudo ln -sf /boot/limine.conf /boot/limine/limine.conf
 
   # Match Snapper configs if not installing from the ISO
   if [[ -z ${OMARCHY_CHROOT_INSTALL:-} ]]; then
