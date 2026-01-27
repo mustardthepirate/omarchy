@@ -1,23 +1,54 @@
 NVIDIA="$(lspci | grep -i 'nvidia')"
 
 if [ -n "$NVIDIA" ]; then
-  # Check which kernel is installed and set appropriate headers package
-  KERNEL_HEADERS="$(pacman -Qqs '^linux(-zen|-lts|-hardened)?$' | head -1)-headers"
-
-  if echo "$NVIDIA" | grep -qE "RTX [2-9][0-9]|GTX 16"; then
-    # Turing (16xx, 20xx), Ampere (30xx), Ada (40xx), and newer recommend the open-source kernel modules
-    PACKAGES=(nvidia-open-dkms nvidia-utils lib32-nvidia-utils libva-nvidia-driver)
-  elif echo "$NVIDIA" | grep -qE "GTX 9|GTX 10|Quadro P|MX1|MX2|MX3"; then
-    # Pascal (10xx, Quadro Pxxx, MX150, MX2xx, and MX3xx) and Maxwell (9xx, MX110, and MX130) use legacy branch that can only be installed from AUR
-    PACKAGES=(nvidia-580xx-dkms nvidia-580xx-utils lib32-nvidia-580xx-utils)
-  fi
-  # Bail if no supported GPU
-  if [ -z "${PACKAGES+x}" ]; then
-    echo "No compatible driver for your NVIDIA GPU. See: https://wiki.archlinux.org/title/NVIDIA"
+  # Opt-out
+  if [ "${OMARCHY_SKIP_NVIDIA:-0}" = "1" ]; then
+    echo "[omarchy] OMARCHY_SKIP_NVIDIA=1 set; skipping NVIDIA."
     exit 0
   fi
 
-  omarchy-pkg-add "$KERNEL_HEADERS" "${PACKAGES[@]}"
+  # Determine installed kernel -> headers (do not guess on custom kernels)
+  KERNEL_HEADERS=""
+  if pacman -Qq linux >/dev/null 2>&1; then
+    KERNEL_HEADERS="linux-headers"
+  elif pacman -Qq linux-lts >/dev/null 2>&1; then
+    KERNEL_HEADERS="linux-lts-headers"
+  elif pacman -Qq linux-zen >/dev/null 2>&1; then
+    KERNEL_HEADERS="linux-zen-headers"
+  elif pacman -Qq linux-hardened >/dev/null 2>&1; then
+    KERNEL_HEADERS="linux-hardened-headers"
+  else
+    echo "[omarchy] Could not infer kernel headers package from installed kernels."
+    echo "[omarchy] uname -r: $(uname -r)"
+    echo "[omarchy] Skipping NVIDIA to avoid DKMS/mkinitcpio failures."
+    exit 0
+  fi
+
+  FLAVOR="${OMARCHY_NVIDIA_FLAVOR:-proprietary}"
+
+  # Default: proprietary DKMS (most compatible across kernels)
+  DRIVER_PKG="nvidia-dkms"
+  UTILS_PKG="nvidia-utils"
+  LIB32_UTILS_PKG="lib32-nvidia-utils"
+  EXTRA_PKGS=(libva-nvidia-driver)
+
+  # Optional: open kernel modules only if explicitly requested
+  if [ "${FLAVOR}" = "open" ]; then
+    DRIVER_PKG="nvidia-open-dkms"
+  fi
+
+  # Legacy 580xx branch is opt-in only (and may require AUR on many systems)
+  if [ "${OMARCHY_NVIDIA_LEGACY_580XX:-0}" = "1" ]; then
+    DRIVER_PKG="nvidia-580xx-dkms"
+    UTILS_PKG="nvidia-580xx-utils"
+    LIB32_UTILS_PKG="lib32-nvidia-580xx-utils"
+    EXTRA_PKGS=()
+  fi
+
+  PACKAGES=("${DRIVER_PKG}" "${UTILS_PKG}" "${LIB32_UTILS_PKG}" "${EXTRA_PKGS[@]}")
+
+  # Install headers + DKMS + driver stack
+  omarchy-pkg-add dkms "${KERNEL_HEADERS}" "${PACKAGES[@]}"
 
   # Configure modprobe for early KMS
   sudo tee /etc/modprobe.d/nvidia.conf <<EOF >/dev/null
@@ -29,12 +60,20 @@ EOF
 MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 EOF
 
-  # Add NVIDIA environment variables
-  cat >>$HOME/.config/hypr/envs.conf <<'EOF'
+  # Rebuild initramfs after installing / configuring NVIDIA
+  sudo mkinitcpio -P
+
+  # Add NVIDIA environment variables (idempotent-ish: append once)
+  mkdir -p "$HOME/.config/hypr"
+  touch "$HOME/.config/hypr/envs.conf"
+  if ! grep -q "^# NVIDIA" "$HOME/.config/hypr/envs.conf"; then
+    cat >>"$HOME/.config/hypr/envs.conf" <<'EOF'
 
 # NVIDIA
 env = NVD_BACKEND,direct
 env = LIBVA_DRIVER_NAME,nvidia
 env = __GLX_VENDOR_LIBRARY_NAME,nvidia
 EOF
+  fi
 fi
+
