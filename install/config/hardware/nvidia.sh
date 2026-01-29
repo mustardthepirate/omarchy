@@ -55,11 +55,6 @@ if [ -n "$NVIDIA" ]; then
 options nvidia_drm modeset=1
 EOF
 
-  # Configure mkinitcpio for early loading
-  sudo tee /etc/mkinitcpio.conf.d/nvidia.conf <<EOF >/dev/null
-MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
-EOF
-
   # Build NVIDIA modules for the newest installed kernel.
   # During an install or full system upgrade, pacman can remove the *running*
   # kernel's /usr/lib/modules/<uname -r>/ tree, which makes DKMS fail with:
@@ -71,6 +66,17 @@ EOF
     sudo dkms autoinstall -k "$LATEST_KVER" || true
   else
     echo "[omarchy] Warning: could not determine latest kernel version from /usr/lib/modules"
+  fi
+
+  # Only force early-loading modules in mkinitcpio if they actually exist.
+  # Otherwise mkinitcpio fails with "module not found: nvidia".
+  if [ -n "$LATEST_KVER" ] && /usr/bin/modinfo -k "$LATEST_KVER" nvidia >/dev/null 2>&1; then
+    sudo tee /etc/mkinitcpio.conf.d/nvidia.conf <<EOF >/dev/null
+MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+EOF
+  else
+    echo "[omarchy] NVIDIA kernel module not present for $LATEST_KVER yet; not adding mkinitcpio MODULES drop-in."
+    sudo rm -f /etc/mkinitcpio.conf.d/nvidia.conf 2>/dev/null || true
   fi
 
   # Rebuild initramfs after installing / configuring NVIDIA
