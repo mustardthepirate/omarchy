@@ -7,6 +7,15 @@ if ! command -v tte &>/dev/null; then
   exit 1
 fi
 
+# Guard against a common Arch partial-upgrade failure mode:
+# python gets bumped (e.g. 3.13 -> 3.14) but python-terminaltexteffects hasn't
+# been rebuilt/updated yet, so /usr/bin/tte exists but the import fails:
+#   ModuleNotFoundError: No module named 'terminaltexteffects'
+if ! /usr/sbin/python -c 'import terminaltexteffects' >/dev/null 2>&1; then
+  notify-send "Screensaver unavailable" "tte is installed but terminaltexteffects is missing. Run: sudo pacman -Syu" 
+  exit 1
+fi
+
 # Exit early if screensave is already running
 pgrep -f org.omarchy.screensaver && exit 0
 
