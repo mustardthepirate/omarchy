@@ -20,4 +20,7 @@ if [[ -n ${OMARCHY_ONLINE_INSTALL:-} ]]; then
 
   # Refresh all repos
   sudo pacman -Syyu --noconfirm
+
+  # Ensure we can mount the EFI System Partition (vfat) reliably
+  sudo pacman -S --noconfirm --needed dosfstools
 fi

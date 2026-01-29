@@ -19,6 +19,7 @@ cups-browsed
 cups-filters
 cups-pdf
 docker
+dosfstools
 docker-buildx
 docker-compose
 dotnet-runtime-9.0

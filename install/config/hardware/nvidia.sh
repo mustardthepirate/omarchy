@@ -51,6 +51,20 @@ if [ -n "$NVIDIA" ]; then
   # If it exists while modules aren't built yet, mkinitcpio will fail with "module not found".
   sudo rm -f /etc/mkinitcpio.conf.d/nvidia.conf 2>/dev/null || true
 
+  # If we're installing proprietary DKMS, try to remove the open module stack to avoid confusion.
+  if [ "$DRIVER_PKG" = "nvidia-dkms" ]; then
+    sudo pacman -Rns --noconfirm nvidia-open-dkms nvidia-open 2>/dev/null || true
+  fi
+
+  # Avoid linux/linux-headers drift (common after interrupted installs/upgrades).
+  # If they differ, install both together so pacman aligns versions (may upgrade or downgrade).
+  LINUX_VER="$(pacman -Q linux 2>/dev/null | awk '{print $2}')"
+  LINUX_HEADERS_VER="$(pacman -Q linux-headers 2>/dev/null | awk '{print $2}')"
+  if [ -n "$LINUX_VER" ] && [ -n "$LINUX_HEADERS_VER" ] && [ "$LINUX_VER" != "$LINUX_HEADERS_VER" ]; then
+    echo "[omarchy] linux ($LINUX_VER) and linux-headers ($LINUX_HEADERS_VER) are out of sync; aligning."
+    omarchy-pkg-add linux linux-headers || true
+  fi
+
   # Install headers + DKMS + driver stack
   omarchy-pkg-add dkms "${KERNEL_HEADERS}" "${PACKAGES[@]}"
 
