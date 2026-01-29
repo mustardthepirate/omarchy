@@ -60,6 +60,19 @@ EOF
 MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 EOF
 
+  # Build NVIDIA modules for the newest installed kernel.
+  # During an install or full system upgrade, pacman can remove the *running*
+  # kernel's /usr/lib/modules/<uname -r>/ tree, which makes DKMS fail with:
+  #   "Missing <kver> kernel modules tree for module nvidia/..."
+  # So we target the latest modules directory instead of relying on uname -r.
+  LATEST_KVER="$(ls -1 /usr/lib/modules 2>/dev/null | sort -V | tail -1)"
+  if [ -n "$LATEST_KVER" ]; then
+    echo "[omarchy] DKMS autoinstall for kernel: $LATEST_KVER"
+    sudo dkms autoinstall -k "$LATEST_KVER" || true
+  else
+    echo "[omarchy] Warning: could not determine latest kernel version from /usr/lib/modules"
+  fi
+
   # Rebuild initramfs after installing / configuring NVIDIA
   sudo mkinitcpio -P
 
