@@ -17,9 +17,23 @@ if [[ -n ${OMARCHY_ONLINE_INSTALL:-} ]]; then
   sudo pacman -Sy
   sudo pacman -S --noconfirm --needed omarchy-keyring
 
+  # Refresh package databases
+  sudo pacman -Syy --noconfirm
 
-  # Refresh all repos
-  sudo pacman -Syyu --noconfirm
+  # Refuse to proceed if mirrors/repos would downgrade the kernel.
+  # This is a strong signal of stale mirrors or repo mismatch and frequently leads
+  # to linux/linux-headers drift + DKMS failures during install.
+  if sudo pacman -Syu --print 2>/dev/null | grep -qE '^:: .*downgrading linux '; then
+    echo "[omarchy] Refusing to proceed: pacman wants to downgrade 'linux'."
+    echo "[omarchy] Fix your mirrorlist/repo config (stale mirrors), then rerun."
+    echo "[omarchy] If you *really* want to allow this, set OMARCHY_ALLOW_KERNEL_DOWNGRADE=1."
+    if [[ "${OMARCHY_ALLOW_KERNEL_DOWNGRADE:-0}" != "1" ]]; then
+      exit 1
+    fi
+  fi
+
+  # Full upgrade
+  sudo pacman -Syu --noconfirm
 
   # Ensure we can mount the EFI System Partition (vfat) reliably
   sudo pacman -S --noconfirm --needed dosfstools
