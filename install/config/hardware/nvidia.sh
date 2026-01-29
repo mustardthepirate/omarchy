@@ -47,6 +47,10 @@ if [ -n "$NVIDIA" ]; then
 
   PACKAGES=("${DRIVER_PKG}" "${UTILS_PKG}" "${LIB32_UTILS_PKG}" "${EXTRA_PKGS[@]}")
 
+  # Clean up any stale mkinitcpio NVIDIA drop-in from a previous failed/partial install.
+  # If it exists while modules aren't built yet, mkinitcpio will fail with "module not found".
+  sudo rm -f /etc/mkinitcpio.conf.d/nvidia.conf 2>/dev/null || true
+
   # Install headers + DKMS + driver stack
   omarchy-pkg-add dkms "${KERNEL_HEADERS}" "${PACKAGES[@]}"
 
