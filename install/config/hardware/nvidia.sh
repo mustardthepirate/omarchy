@@ -66,6 +66,15 @@ EOF
   # So we target the latest modules directory instead of relying on uname -r.
   LATEST_KVER="$(ls -1 /usr/lib/modules 2>/dev/null | sort -V | tail -1)"
   if [ -n "$LATEST_KVER" ]; then
+    # Ensure headers are present for the target kernel.
+    # When linux/linux-headers get out of sync (common after interrupted upgrades),
+    # DKMS will succeed for *no* kernel and mkinitcpio will complain about missing modules.
+    if [ ! -e "/usr/lib/modules/$LATEST_KVER/build" ]; then
+      echo "[omarchy] Missing kernel headers for $LATEST_KVER (no /usr/lib/modules/$LATEST_KVER/build)."
+      echo "[omarchy] Attempting to install headers: $KERNEL_HEADERS"
+      omarchy-pkg-add "$KERNEL_HEADERS" || true
+    fi
+
     echo "[omarchy] DKMS autoinstall for kernel: $LATEST_KVER"
     sudo dkms autoinstall -k "$LATEST_KVER" || true
   else
