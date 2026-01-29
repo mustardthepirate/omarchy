@@ -18,16 +18,15 @@ fi
 # Ensure a recent node is available. Use the version Omarchy itself uses.
 NODE_VERSION="${OMARCHY_NODE_VERSION:-25.4.0}"
 
-# Install and activate node globally via mise
+# Install node via mise.
 mise install "node@${NODE_VERSION}" >/dev/null
-mise use -g "node@${NODE_VERSION}" >/dev/null
 
 # Install clawdbot globally into ~/.local so it doesn't require sudo.
 export NPM_CONFIG_PREFIX="$HOME/.local"
 mkdir -p "$HOME/.local/bin"
 
-# npm comes from the mise-provided node
-npm install -g clawdbot
+# Use mise exec so PATH is correct in non-interactive shells.
+mise exec "node@${NODE_VERSION}" -- npm install -g clawdbot
 
 if command -v clawdbot >/dev/null 2>&1; then
   echo "clawdbot installed: $(clawdbot --version 2>/dev/null || echo ok)"
