@@ -49,8 +49,13 @@ EOF
   fi
 
   # Ensure compat path always exists for tools/scripts expecting /boot/limine/limine.conf
+  # Also remove conflicting config locations so Limine loads /boot/limine.conf predictably.
   sudo mkdir -p /boot/limine
+  if [ -e /boot/limine/limine.conf ] && [ ! -L /boot/limine/limine.conf ]; then
+    sudo rm -f /boot/limine/limine.conf
+  fi
   sudo ln -sf /boot/limine.conf /boot/limine/limine.conf
+  sudo rm -f /boot/EFI/limine/limine.conf /boot/EFI/BOOT/limine.conf 2>/dev/null || true
 
   # Match Snapper configs if not installing from the ISO
   if [[ -z ${OMARCHY_CHROOT_INSTALL:-} ]]; then
